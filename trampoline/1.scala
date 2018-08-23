@@ -5,6 +5,7 @@ object Main extends App {
     case Nil => true
     case x :: xs => odd(xs)
   }
+
   def odd[A](l: List[A]): Boolean = l match {
     case Nil => false
     case x :: xs => even(xs)
