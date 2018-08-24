@@ -1,3 +1,6 @@
+/**
+  https://medium.com/@olxc/trampolining-and-stack-safety-in-scala-d8e86474ddfa
+ */
 import scala.language.higherKinds
 
 object Main extends App {
