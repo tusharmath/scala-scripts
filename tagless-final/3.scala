@@ -1,5 +1,6 @@
 /*
  * https://blog.scalac.io/exploring-tagless-final.html
+ * https://www.youtube.com/watch?v=IhVdU4Xiz2U
  */
 
 
