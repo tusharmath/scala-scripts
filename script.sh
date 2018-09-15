@@ -1,0 +1,1 @@
+fswatch -0 -Ie ".*" -i ".*\.scala$" . | xargs -0 -n 1 -I {} scala {}
