@@ -48,16 +48,16 @@ object Main extends App {
     trait FreeAp[F[_], A]
 
     object FreeAp {
-      def lift[F[_], A](fa: F[A]): FreeAp[F, A]                                 = Lift(fa)
-      def pure[F[_], A](a: A): FreeAp[F, A]                                     = Pure(a)
-      def ap[F[_], P, A](fp: FreeAp[F, P], fn: FreeAp[F, P => A]): FreeAp[F, A] = Ap(fp, fn)
-      def map[F[_], A, B](fa: FreeAp[F, A], ab: A => B): FreeAp[F, B]           = Map(fa)(ab)
+      def lift[F[_], A](fa: F[A]): FreeAp[F, A]                                    = Lift(fa)
+      def pure[F[_], A](a: A): FreeAp[F, A]                                        = Pure(a)
+      def ap[F[_], P, A](ffp: FreeAp[F, P], ffpa: FreeAp[F, P => A]): FreeAp[F, A] = Ap(ffp, ffpa)
+      def map[F[_], A, B](ffa: FreeAp[F, A], ab: A => B): FreeAp[F, B]             = Map(ffa, ab)
     }
 
-    case class Ap[F[_], P, A](fp: FreeAp[F, P], fn: FreeAp[F, P => A]) extends FreeAp[F, A]
-    case class Lift[F[_], A](fa: F[A])                                 extends FreeAp[F, A]
-    case class Pure[F[_], A](a: A)                                     extends FreeAp[F, A]
-    case class Map[F[_], A, B](fa: FreeAp[F, A])(ab: A => B)           extends FreeAp[F, B]
+    case class Ap[F[_], P, A](ffp: FreeAp[F, P], ffpa: FreeAp[F, P => A]) extends FreeAp[F, A]
+    case class Lift[F[_], A](fa: F[A])                                    extends FreeAp[F, A]
+    case class Pure[F[_], A](a: A)                                        extends FreeAp[F, A]
+    case class Map[F[_], A, B](ffa: FreeAp[F, A], ab: A => B)             extends FreeAp[F, B]
   }
 
   import Free._
@@ -65,14 +65,9 @@ object Main extends App {
 
   // Actual Program
   trait DSL[A]
-  case class Ask(question: String) extends DSL[String]
-  case class Say(message: String)  extends DSL[Unit]
-  case class Fetch(url: String)    extends DSL[String]
-  case class Print(data: Any)      extends DSL[Unit]
-  case class DbRead(key: String)   extends DSL[Int]
+  case class Fetch(url: String) extends DSL[String]
 
   type FreeDSL[A] = FreeAp[DSL, A]
-
   implicit object dslApplicative extends Applicative[FreeDSL] {
     def map[A, B](fa: FreeDSL[A])(ab: A => B): FreeDSL[B]          = FreeAp.map(fa, ab)
     def ap[A, B](fa: FreeDSL[A])(fab: FreeDSL[A => B]): FreeDSL[B] = FreeAp.ap(fa, fab)
@@ -80,15 +75,33 @@ object Main extends App {
   }
 
   def fetch(url: String): FreeDSL[String]    = FreeAp.lift(Fetch(url))
-  def dbRead(key: String): FreeDSL[Int]      = FreeAp.lift(DbRead(key))
   def par[A, B](): FreeDSL[A => B => (A, B)] = FreeAp.pure((a: A) => (b: B) => (a, b))
 
-  def program() = {
-    val httpResponse   = fetch("google.com")
-    val dbReadResponse = dbRead("user-count")
-    val bothOFThem     = httpResponse && dbReadResponse
-    bothOFThem.map({ case (a, b) => a + b })
+  def program(): FreeDSL[Unit] = {
+    val man    = fetch("man")
+    val woman  = fetch("woman")
+    val couple = man && woman
+    couple.map({ case (a, b) => println(a + b) })
   }
 
-  println(program())
+  trait Executor[F[_]] {
+    def apply[A](program: F[A]): A
+  }
+
+  def interpret[F[_], A](f: FreeAp[F, A])(execute: Executor[F]): A = f match {
+    case Ap(ffp, ffpa) => {
+      val p  = interpret(ffp)(execute)
+      val pa = interpret(ffpa)(execute)
+      pa(p)
+    }
+    case Lift(fa)     => execute(fa)
+    case Pure(a)      => a
+    case Map(ffa, ab) => ab(interpret(ffa)(execute))
+  }
+
+  interpret(program())(new Executor[DSL] {
+    def apply[A](dsl: DSL[A]): A = dsl match {
+      case Fetch(req) => req + "---RESPONSE"
+    }
+  })
 }
