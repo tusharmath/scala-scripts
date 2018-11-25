@@ -1,3 +1,5 @@
+// https://gist.github.com/jdegoes/1b43f43e2d1e845201de853815ab3cb9
+
 import scala.io.StdIn._
 import scala.util._
 
